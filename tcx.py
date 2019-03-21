@@ -8,6 +8,7 @@ Created on Thu Mar 21 07:47:24 2019
 import pandas as pd
 import datetime
 import math
+import numpy as np
 
 import xml.etree.ElementTree as ET
 
@@ -174,53 +175,76 @@ class tcx(object):
         return data_df, last_trackpoint    
     
     
-def gradient_summary(self, data_df, zero_speed_threshold, 
-                     gradient_label, min_grad, max_grad, output=True):
-    """
-    Summarise the data by gradient   
-    
-    """
-
-    totals = data_df.sum()
-    zero_totals = data_df[data_df['speed'] < zero_speed_threshold].sum()
-    nonzero_totals = data_df[data_df['speed'] >= zero_speed_threshold].sum()
-    
-    
-    x_totals = data_df[(data_df['alt_pc'] <= max_grad) &
-                        (data_df['alt_pc'] > min_grad)].sum()
-
-    zero_totals = data_df[(data_df['alt_pc'] <= max_grad) &
-                            (data_df['alt_pc'] > min_grad) &
-                            (data_df['speed'] < zero_speed_threshold)].sum()
-
-    nonzero_totals = data_df[(data_df['alt_pc'] <= max_grad) &
-                               (data_df['alt_pc'] > min_grad) & 
-                               (data_df['speed'] >= zero_speed_threshold)].sum()
-    
-    nonzero_means = data_df[(data_df['alt_pc'] <= max_grad) &
-                            (data_df['alt_pc'] > min_grad) & 
-                            (data_df['speed'] >= zero_speed_threshold)].mean()
-    
-
-    
-    if output:
-    
-        print()
-        print(gradient_label)
-        print('--------------------------------')
-        print('Total ascent (m): {:,.1f}'.format(x_totals['alt_diff']))
-        print('Total distance (km, %): {:,.1f}, {:.1%}'.format(x_totals['dis'], x_totals['dis'] / totals['dis']))
-        print('Total duration (hours, %): {:,.1f}, {:.1%}'.format(x_totals['dur'] / 3600.0, x_totals['dur'] / totals['dur']))
-        print('Avg Speed (km/hr): {:,.1f}'.format(x_totals['dis'] / (x_totals['dur'] / 3600.0)))
-        print('Zero Speed: Distance (km, %): {:,.1f}, {:.1%}'.format(zero_totals['dis'], 
-                                                                        zero_totals['dis'] / totals['dis']))
-        print('Zero Speed: Duration (hours, %): {:,.1f}, {:.1%}'.format(zero_totals['dur'] / 3600.0, 
-                                                                        zero_totals['dur'] / totals['dur']))
-        print('Non Zero Speed: Avg BPM: {:,.1f}'.format(nonzero_means['bpm']))
-        print('Non Zero Speed: Distance (km, %): {:,.1f}, {:.1%}'.format(nonzero_totals['dis'], 
-                                                                         nonzero_totals['dis'] / totals['dis']))
-        print('Non Zero Speed: Duration (hours, %): {:,.1f}, {:.1%}'.format(nonzero_totals['dur'] / 3600.0, 
-                                                                            nonzero_totals['dur'] / totals['dur']))
-        print('Non Zero Speed: Avg Speed (km/hr): {:,.1f}'.format(nonzero_totals['dis'] / 
-                                                                  (nonzero_totals['dur'] / 3600.0)))
+    def gradient_summary(self, data_df, zero_speed_threshold, data_label, 
+                         gradient_label, min_grad, max_grad, output=True):
+        """
+        Summarise the data by gradient   
         
+        """
+    
+        totals = data_df.sum()
+        zero_totals = data_df[data_df['speed'] < zero_speed_threshold].sum()
+        nonzero_totals = data_df[data_df['speed'] >= zero_speed_threshold].sum()
+        
+        
+        x_totals = data_df[(data_df['alt_pc'] <= max_grad) &
+                            (data_df['alt_pc'] > min_grad)].sum()
+    
+        zero_totals = data_df[(data_df['alt_pc'] <= max_grad) &
+                                (data_df['alt_pc'] > min_grad) &
+                                (data_df['speed'] < zero_speed_threshold)].sum()
+    
+        nonzero_totals = data_df[(data_df['alt_pc'] <= max_grad) &
+                                   (data_df['alt_pc'] > min_grad) & 
+                                   (data_df['speed'] >= zero_speed_threshold)].sum()
+        
+        nonzero_means = data_df[(data_df['alt_pc'] <= max_grad) &
+                                (data_df['alt_pc'] > min_grad) & 
+                                (data_df['speed'] >= zero_speed_threshold)].mean()
+        
+        if nonzero_totals['dur'] > 0:
+            speed = nonzero_totals['dis'] / (nonzero_totals['dur'] / 3600.0)
+        else:
+            speed = 0
+    
+        bpm_data_df = data_df[(data_df['alt_pc'] <= max_grad) &
+                                (data_df['alt_pc'] > min_grad) & 
+                                (data_df['speed'] >= zero_speed_threshold)].loc[:, ['dur', 'bpm']]
+        if bpm_data_df.shape[0] > 0:
+            avg_bpm = np.average(bpm_data_df['bpm'], weights=bpm_data_df['dur'])
+        else:
+            avg_bpm = 0
+        
+        if totals['dur'] > 0:
+            dur_pc = nonzero_totals['dur'] / totals['dur'] 
+        else:
+            dur_pc = 0
+        
+        return_df = pd.DataFrame([[speed, avg_bpm, dur_pc]], 
+                                 index=[gradient_label],
+                                 columns=['speed_' + data_label, 
+                                          'bpm_' + data_label,
+                                          'dur_' + data_label])
+                
+        if output:
+        
+            print()        
+            print(data_label + ' : ' + gradient_label)
+            print('--------------------------------')
+            print('Total ascent (m): {:,.1f}'.format(x_totals['alt_diff']))
+            print('Total distance (km, %): {:,.1f}, {:.1%}'.format(x_totals['dis'], x_totals['dis'] / totals['dis']))
+            print('Total duration (hours, %): {:,.1f}, {:.1%}'.format(x_totals['dur'] / 3600.0, x_totals['dur'] / totals['dur']))
+            print('Avg Speed (km/hr): {:,.1f}'.format(x_totals['dis'] / (x_totals['dur'] / 3600.0)))
+            print('Zero Speed: Distance (km, %): {:,.1f}, {:.1%}'.format(zero_totals['dis'], 
+                                                                            zero_totals['dis'] / totals['dis']))
+            print('Zero Speed: Duration (hours, %): {:,.1f}, {:.1%}'.format(zero_totals['dur'] / 3600.0, 
+                                                                            zero_totals['dur'] / totals['dur']))
+            print('Non Zero Speed: Avg BPM: {:,.1f}'.format(nonzero_means['bpm']))
+            print('Non Zero Speed: Distance (km, %): {:,.1f}, {:.1%}'.format(nonzero_totals['dis'], 
+                                                                             nonzero_totals['dis'] / totals['dis']))
+            print('Non Zero Speed: Duration (hours, %): {:,.1f}, {:.1%}'.format(nonzero_totals['dur'] / 3600.0, 
+                                                                                nonzero_totals['dur'] / totals['dur']))
+            print('Non Zero Speed: Avg Speed (km/hr): {:,.1f}'.format(nonzero_totals['dis'] / 
+                                                                      (nonzero_totals['dur'] / 3600.0)))
+            
+        return return_df
