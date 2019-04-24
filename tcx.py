@@ -178,8 +178,14 @@ class tcx(object):
     def gradient_summary(self, data_df, zero_speed_threshold, data_label, 
                          gradient_label, min_grad, max_grad, output=True):
         """
-        Summarise the data by gradient   
+        Summarise the data for a specific gradient range (measured as a ratio)
         
+        data_df: has the data
+        zero_speed_threshold: anything below this speed (kph) reported seperately
+        data_label: added as a postfix to column headings in output dataframe
+        gradient_label: used as row headings in output dataframe
+        min_grad, max_grad: range of gradients to summarise
+        output: printed summary required?        
         """
     
         totals = data_df.sum()
