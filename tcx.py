@@ -254,3 +254,57 @@ class tcx(object):
                                                                       (nonzero_totals['dur'] / 3600.0)))
             
         return return_df
+    
+    
+    
+    def lap_summary(data_df, interval, zero_speed_threshold, 
+                    speed_zones, flat_gradient=0.02
+                    start=True):
+        """
+        Produce summary stats for each lap where a lap is based upon
+        a specified interval.
+        
+        The interval laps can either start at the start of the data and go
+        forwards or start at the end and go backwards. start=True means 
+        intervals based upon the start.
+        
+        Summary Metrics:
+            avg speed
+            flat avg speed (flat_gradient number)
+        
+        """    
+                
+        from_dist = 0
+        end_of_data = False
+        lap_summary = {}
+        
+        while not end_of_data:
+            to_dist = from_dist + interval                      
+            
+            df = data_df[(data_df['cum_dis'] >= from_dist) &
+                         (data_df['cum_dis'] < to_dist)]
+            
+            if df.shape[0] == 0:
+                end_of_data = True
+            else:
+                #start_df = df.iloc[0,:]
+                #end_df = df.iloc[-1,:]                
+                #dis = end_df['cum_dis'] - start_df['cum_dis']
+                #dur = end_df['cum_dur'] - start_df['cum_dur']
+                dis = df['dis'].sum()
+                dur = df['dur'].sum()                
+                avg_speed = dis / (dur / 3600)
+                
+                flat_dis = df[(df['alt_pc'] <= flat_gradient) &
+                              (df['alt_pc'] >= -flat_gradient)].loc['dis'].sum()
+                flat_dur = df[(df['alt_pc'] <= flat_gradient) &
+                              (df['alt_pc'] >= -flat_gradient)].loc['dur'].sum()
+                flat_avg_speed = flat_dis / (flat_dur / 3600)
+                
+                from_dist = to_dist
+                
+                lap_summary[to_dist] = (avg_speed, flat_avg_speed)
+        
+        return lap_summary
+            
+            
