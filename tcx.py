@@ -341,7 +341,8 @@ class tcx(object):
         return return_df
     
     
-    def overall_summary(self, data_df, zero_speed_threshold, pa_stop_speed):
+    def overall_summary(self, data_df, zero_speed_threshold, pa_stop_speed, 
+                        flat_gradient=0.02):
         """
         Summarise the data in data_df:
             avg speed (km per hr)
@@ -351,10 +352,13 @@ class tcx(object):
             total descent (m)
             total and percent of time less than zero_speed_threshold
             total and percent of time greater than pa_stop_speed
+            
+            flat avg speed (flat_gradient number)
+            percent distance and duration flat
         """
     
-        tot_dis = data_df.iloc[-1, :]['cum_dis']
-        tot_dur = data_df.iloc[-1, :]['cum_dur']
+        tot_dis = data_df['dis'].sum()
+        tot_dur = data_df['dur'].sum()
         avg_speed = 3600 * tot_dis / tot_dur
         
         tot_asc = data_df[data_df['alt_diff'] > 0]['alt_diff'].sum()
@@ -373,6 +377,18 @@ class tcx(object):
         pa_dur_pc = 1 - (zero_dur_pc + nonpa_dur_pc)
         pa_dis_pc = 1 - (zero_dis_pc + nonpa_dis_pc)  
 
+        flat_dis = data_df[(data_df['alt_pc'] > -flat_gradient) &
+                           (data_df['alt_pc'] < flat_gradient)]['dis'].sum()
+        
+        flat_dur = data_df[(data_df['alt_pc'] > -flat_gradient) &
+                           (data_df['alt_pc'] < flat_gradient)]['dur'].sum()
+        
+        flat_avg_speed = 3600 * flat_dis / flat_dur
+        flat_dis_pc = flat_dis / tot_dis
+        flat_dur_pc = flat_dur / tot_dur
+
+        
+        
         return_dic = {'tot_dis' : tot_dis,
                       'tot_dur' : tot_dur,
                       'avg_speed' : avg_speed,
@@ -383,26 +399,26 @@ class tcx(object):
                       'pa_dur_pc' : pa_dur_pc,
                       'pa_dis_pc' : pa_dis_pc,
                       'nonpa_dur_pc' : nonpa_dur_pc,
-                      'nonpa_dis_pc' : nonpa_dis_pc}
+                      'nonpa_dis_pc' : nonpa_dis_pc,
+                      'flat_avg_speed' : flat_avg_speed,
+                      'flat_dis_pc' : flat_dis_pc,
+                      'flat_dur_pc' : flat_dur_pc}
         
         return return_dic
 
 
 
-    def lap_summary(data_df, interval, zero_speed_threshold, 
-                    speed_zones, flat_gradient=0.02,
-                    start=True):
+    def lap_summary(self, data_df, interval, zero_speed_threshold, 
+                    pa_stop_speed, flat_gradient=0.02):
         """
         Produce summary stats for each lap where a lap is based upon
         a specified interval.
         
         The interval laps can either start at the start of the data and go
-        forwards or start at the end and go backwards. start=True means 
-        intervals based upon the start.
+        forwards or start at the end and go backwards. 
         
         Summary Metrics:
-            avg speed
-            flat avg speed (flat_gradient number)
+            those in overall_summary
         
         """    
                 
@@ -411,7 +427,7 @@ class tcx(object):
         lap_summary = {}
         
         while not end_of_data:
-            to_dist = from_dist + interval                      
+            to_dist = from_dist + interval               
             
             df = data_df[(data_df['cum_dis'] >= from_dist) &
                          (data_df['cum_dis'] < to_dist)]
@@ -419,23 +435,11 @@ class tcx(object):
             if df.shape[0] == 0:
                 end_of_data = True
             else:
-                #start_df = df.iloc[0,:]
-                #end_df = df.iloc[-1,:]                
-                #dis = end_df['cum_dis'] - start_df['cum_dis']
-                #dur = end_df['cum_dur'] - start_df['cum_dur']
-                dis = df['dis'].sum()
-                dur = df['dur'].sum()                
-                avg_speed = dis / (dur / 3600)
+                summary = self.overall_summary(df, zero_speed_threshold, 
+                                               pa_stop_speed, flat_gradient) 
                 
-                flat_dis = df[(df['alt_pc'] <= flat_gradient) &
-                              (df['alt_pc'] >= -flat_gradient)].loc['dis'].sum()
-                flat_dur = df[(df['alt_pc'] <= flat_gradient) &
-                              (df['alt_pc'] >= -flat_gradient)].loc['dur'].sum()
-                flat_avg_speed = flat_dis / (flat_dur / 3600)
-                
+                lap_summary[to_dist] = summary
                 from_dist = to_dist
-                
-                lap_summary[to_dist] = (avg_speed, flat_avg_speed)
         
         return lap_summary
             
